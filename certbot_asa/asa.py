@@ -12,7 +12,13 @@ class RestAsa(common.TLSSNI01):
     """Class talks to ASA via REST API"""
 
     def __init__(self, host, user, passwd, noverify, castore):
-        self.host = host
+        hostval = host.split(':')
+        self.host = hostval[0]
+        if len(hostval) > 1:
+            self.port = hostval[1]
+        else:
+	    """Default port if not specified"""
+            self.port = '443'
         self.user = user
         self.passwd = passwd
         self.noverify = noverify
@@ -30,7 +36,7 @@ class RestAsa(common.TLSSNI01):
         import socket
 	s = socket.socket()
 	try:
-		s.connect((self.host, 443))
+		s.connect((self.host, int(self.port)))
 		s.close()
 		return True
 	except socket.error, e:
@@ -43,7 +49,7 @@ class RestAsa(common.TLSSNI01):
             return
         headers = {'Content-Type': 'application/json'}
         apiPath = "/api/certificate/identity/"+trustpoint
-        apiUrl = "https://"+self.host+apiPath
+        apiUrl = "https://"+self.host+":"+self.port+apiPath
         r = requests.get(apiUrl, headers=headers, auth=(self.user, self.passwd), verify=self.verify)
         try: 
             keyPair = r.json()['keyPair']
@@ -62,7 +68,7 @@ class RestAsa(common.TLSSNI01):
                 self.remove_keypair(keyPair)
         else:
             apiPath = "/api/certificate/ca/"+trustpoint
-            apiUrl = "https://"+self.host+apiPath
+            apiUrl = "https://"+self.host+":"+self.port+apiPath
             r = requests.delete(apiUrl, auth=(self.user, self.passwd), verify=self.verify)
 
 
@@ -75,7 +81,7 @@ class RestAsa(common.TLSSNI01):
 
         headers = {'Content-Type': 'application/json'}
         api_path = "/api/certificate/keypair/"+keypair_name
-        url = "https://"+self.host+api_path
+        url = "https://"+self.host+":"+self.port+api_path
 
         req = urllib2.Request(url, None, headers)
         base64string = base64.encodestring('%s:%s' % (self.user, self.passwd)).replace('\n', '')
@@ -106,7 +112,7 @@ class RestAsa(common.TLSSNI01):
     def get_cert_json(self, trustpoint):
         """Returns cert details from the specified trustpoint"""
         apiPath = '/api/certificate/details/'
-        apiUrl = 'https://'+self.host+apiPath+trustpoint
+        apiUrl = 'https://'+self.host+":"+self.port+apiPath+trustpoint
         i = requests.get(apiUrl, auth=(self.user, self.passwd), verify=self.verify)
         return i.json()
 
@@ -127,7 +133,7 @@ class RestAsa(common.TLSSNI01):
     def get_time(self):
         import datetime
         apiPath = '/api/monitoring/clock'
-        apiUrl = 'https://'+self.host+apiPath
+        apiUrl = 'https://'+self.host+":"+self.port+apiPath
         headers = {'Content-Type': 'application/json'}
         r = requests.get(apiUrl, headers=headers, auth=(self.user, self.passwd), verify=self.verify)
         timestring = r.json()['time']+" "+r.json()['timeZone']+" "+r.json()['date']
@@ -157,7 +163,7 @@ class RestAsa(common.TLSSNI01):
     def writemem(self):
         """Saves configuration"""
         apiPath = '/api/commands/writemem'
-        apiUrl = 'https://'+self.host+apiPath
+        apiUrl = 'https://'+self.host+":"+self.port+apiPath
         headers = {'Content-Type': 'application/json'}
         r = requests.post(apiUrl, headers=headers, data={}, auth=(self.user, self.passwd), verify=self.verify)
         if r.status_code == 200:
@@ -171,13 +177,13 @@ class RestAsa(common.TLSSNI01):
         trustpoints = []
         if certtype == "identity" or certtype == None:
             apiPath = '/api/certificate/identity'
-            apiUrl = 'https://'+self.host+apiPath
+            apiUrl = 'https://'+self.host+":"+self.port+apiPath
             i = requests.get(apiUrl, auth=(self.user, self.passwd), verify=self.verify)
             for x in range(len(i.json()['items'])):
                 trustpoints.append(i.json()['items'][x]['objectId'])
         if certtype == "ca" or certtype == None:
             apiPath = '/api/certificate/ca'
-            apiUrl = 'https://'+self.host+apiPath
+            apiUrl = 'https://'+self.host+":"+self.port+apiPath
             c = requests.get(apiUrl, auth=(self.user, self.passwd), verify=self.verify)
             for x in range(len(c.json()['items'])):
                 trustpoints.append(c.json()['items'][x]['trustpointName'])
@@ -189,7 +195,7 @@ class RestAsa(common.TLSSNI01):
         import requests
         requests.packages.urllib3.disable_warnings()
         apiPath = '/api/certificate/ca'
-        apiUrl = 'https://'+self.host+apiPath
+        apiUrl = 'https://'+self.host+":"+self.port+apiPath
         headers = {'Content-Type': 'application/json'}
         auth = (self.user, self.passwd)
         verify = self.verify
@@ -213,7 +219,7 @@ class RestAsa(common.TLSSNI01):
 
         headers = {'Content-Type': 'application/json'}
         api_path = "/api/certificate/identity"
-        url = "https://"+self.host+api_path
+        url = "https://"+self.host+":"+self.port+api_path
 
         post_data = {}
         post_data["certPass"] = PassPhrase
@@ -255,7 +261,7 @@ class RestAsa(common.TLSSNI01):
 
         headers = {'Content-Type': 'application/json'}
         api_path = "/api/cli"
-        url = "https://" + self.host + api_path
+        url = "https://" + self.host + ":"+self.port+api_path
         f = None
         command = "ssl trust-point "+trustpoint+" domain "+z_domain
         post_data = { "commands": [ command ] }
@@ -290,7 +296,7 @@ class RestAsa(common.TLSSNI01):
 
         headers = {'Content-Type': 'application/json'}
         api_path = "/api/cli"
-        url = "https://" + self.host + api_path
+        url = "https://" + self.host + ":"+self.port+api_path
         f = None
         post_data = { "commands": [ "show version" ] }
         req = urllib2.Request(url, json.dumps(post_data), headers)
